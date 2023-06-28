@@ -1,0 +1,12 @@
+$ go test -bench . -count 5
+goos: linux
+goarch: amd64
+pkg: users
+cpu: 12th Gen Intel(R) Core(TM) i7-1255U
+BenchmarkCountryCount-12    	   21124	     58382 ns/op
+BenchmarkCountryCount-12    	   20442	     58994 ns/op
+BenchmarkCountryCount-12    	   20472	     58525 ns/op
+BenchmarkCountryCount-12    	   19894	     59722 ns/op
+BenchmarkCountryCount-12    	   20163	     59980 ns/op
+PASS
+ok  	users	9.079s

@@ -1,0 +1,24 @@
+$ go test -c
+$ perf stat -e cache-misses ./users.test -test.bench . -test.count=5
+goos: linux
+goarch: amd64
+pkg: users
+cpu: 12th Gen Intel(R) Core(TM) i7-1255U
+BenchmarkCountryCount-12    	   20756	     59736 ns/op
+BenchmarkCountryCount-12    	   20162	     58511 ns/op
+BenchmarkCountryCount-12    	   20114	     59946 ns/op
+BenchmarkCountryCount-12    	   19858	     59116 ns/op
+BenchmarkCountryCount-12    	   20235	     58823 ns/op
+PASS
+
+ Performance counter stats for './users.test -test.bench . -test.count=5':
+
+           654,670      cpu_core/cache-misses:u/                                                (98.40%)
+        12,561,851      cpu_atom/cache-misses:u/                                                (2.13%)
+
+       9.062694134 seconds time elapsed
+
+       9.082485000 seconds user
+       0.026707000 seconds sys
+
+
