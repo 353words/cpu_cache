@@ -6,8 +6,8 @@ type Image []byte
 
 type User struct {
 	Login   string
-	Icon    Image
 	Active  bool
+	Icon    Image
 	Country string
 }
 
