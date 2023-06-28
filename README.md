@@ -323,9 +323,12 @@ More data fits inside cache lines leading to faster code.
 One of the reason I love optimizing code for my clients is that extent of knowledge I need to learn.
 Not only data structures and algorithms, but also computer architecture, how the Go runtime works, networking and much more.
 
-We got a significant performance boost from a small code change, but [TANSTAAFL][free] applies here as well.
+We got a significant performance boost from a small code change, but TANSTAAFL[^fl] applies here as well.
 The code is riskier since now `Icon` might be `nil`. 
 we also need to allocate memory on the heap per `User` struct, heap allocation take more time.
 Lastly, the garbage collector need to work harder since we have more data on the heap - but that a discussion for another blog post.
 
-[free]: https://en.wikipedia.org/wiki/There_ain%27t_no_such_thing_as_a_free_lunch
+If you want to read more on the subject, you can start with reading [Cache-oblivious algorithm][co] and following the links there.
+
+[^fl]: [There ain't no such thing as a free lunch](https://en.wikipedia.org/wiki/There_ain%27t_no_such_thing_as_a_free_lunch)
+[co]: https://en.wikipedia.org/wiki/Cache-oblivious_algorithm
