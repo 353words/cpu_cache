@@ -333,6 +333,9 @@ Lastly, the garbage collector needs to work harder since we have more data on th
 
 If you want to read more on the subject, you can start with reading [Cache-oblivious algorithm][co] and following the links there.
 
+You can find the code for this blog post [here][gh].
+
 [co]: https://en.wikipedia.org/wiki/Cache-oblivious_algorithm
+[gh]: https://github.com/353words/cpu_cache
 [^fl]: [There ain't no such thing as a free lunch](https://en.wikipedia.org/wiki/There_ain%27t_no_such_thing_as_a_free_lunch)
 
