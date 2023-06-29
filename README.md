@@ -17,7 +17,7 @@ The architecture looks something like this:
 
 ![](cpu-cache.png)
 
-Figure 1 shows the layers of cache the CPU goes before it reaches the main memory.
+Figure 1 shows the layers of cache the CPU goes before it reaches the main memory. Each CPU has its own L1 and L2 cache, the L3 cache is shared among all CPUs.
 The main memory is about 80 times slower than the L1 cache.
 (source: [Memory Performance in a Nutshell][mem])
 
