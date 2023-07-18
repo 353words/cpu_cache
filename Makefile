@@ -1,4 +1,4 @@
-.PHONY: bench build perf
+.PHONY: bench build perf slice array
 
 perf: build
 	perf stat -e cache-misses ./users.test -test.bench . -test.count=5

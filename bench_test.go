@@ -1,1 +1,1 @@
-./slice/bench_test.go
+array/bench_test.go
