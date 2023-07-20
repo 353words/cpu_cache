@@ -1,6 +1,4 @@
-go clean -cache -testcache
-go test -c
-perf stat -e cache-misses ./users.test -test.bench . -test.benchtime=10s -test.count=5
+$ perf stat -e cache-misses ./users.test -test.bench . -test.benchtime=10s -test.count=5
 goos: linux
 goarch: amd64
 pkg: users
@@ -11,3 +9,13 @@ BenchmarkCountryCount-12    	  185040	     63432 ns/op
 BenchmarkCountryCount-12    	  190237	     63356 ns/op
 BenchmarkCountryCount-12    	  191358	     63726 ns/op
 PASS
+
+ Performance counter stats for './users.test -test.bench . -test.benchtime=10s -test.count=5':
+
+         1,828,311      cpu_core/cache-misses:u/                                                (99.69%)
+       306,533,948      cpu_atom/cache-misses:u/                                                (0.31%)
+
+      63.630108076 seconds time elapsed
+
+      63.610744000 seconds user
+       0.103127000 seconds sys
