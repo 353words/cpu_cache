@@ -1,12 +1,13 @@
-$ go test -bench . -count 5
+go clean -cache -testcache
+go test -bench . -benchtime=10s -count=5     
 goos: linux
 goarch: amd64
 pkg: users
 cpu: 12th Gen Intel(R) Core(TM) i7-1255U
-BenchmarkCountryCount-12    	   21124	     58382 ns/op
-BenchmarkCountryCount-12    	   20442	     58994 ns/op
-BenchmarkCountryCount-12    	   20472	     58525 ns/op
-BenchmarkCountryCount-12    	   19894	     59722 ns/op
-BenchmarkCountryCount-12    	   20163	     59980 ns/op
+BenchmarkCountryCount-12    	  189669	     63774 ns/op
+BenchmarkCountryCount-12    	  185011	     63880 ns/op
+BenchmarkCountryCount-12    	  188542	     63865 ns/op
+BenchmarkCountryCount-12    	  187938	     64261 ns/op
+BenchmarkCountryCount-12    	  186956	     64297 ns/op
 PASS
-ok  	users	9.079s
+ok  	users	63.364s
