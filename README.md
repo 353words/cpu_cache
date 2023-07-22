@@ -1,35 +1,28 @@
 # Getting Friendly With Your CPU Cache
-+++
-title = "Getting Friendly With Your CPU Cache"
-date = "FIXME"
-tags = ["golang"]
-categories = [ "golang" ]
-url = "FIXME"
-author = "mikit"
-+++
 
 ## CPU Cache
 
-When a CPU tries to access a piece of data, it first goes through three layers of cache before hitting the main memory.
+When a CPU needs to access a piece of data, the data needs to travel into the processor from main memory. 
+
 The architecture looks something like this:
 
 **Figure 1: CPU Cache**  
 
-
 ![](cpu-cache.png)
 
-Figure 1 shows the layers of cache the CPU goes before it reaches the main memory. Each CPU has its own L1 and L2 cache, the L3 cache is shared among all CPUs.
-The main memory is about 80 times slower than the L1 cache.
-(source: [Memory Performance in a Nutshell][mem])
+Figure 1 shows the different layers of memory a piece of data has to travel to be accessible by the processor. Each CPU has its own L1 and L2 cache, and the L3 cache is shared among all CPUs. When the data finally makes its way inside the L1 or L2 cache, the processor can access it for execution purposes. On Intel architectures the L3 cache maintains a copy of what is in L1 and L2.
 
-[mem]: https://www.intel.com/content/www/us/en/developer/articles/technical/memory-performance-in-a-nutshell.html
+Performance in the end is about how efficiently data can flow into the processor. As you can see from the diagram, main memory access is about 80 times slower than accessing the L1 cache since the data needs to be moved and copied.
+
+(source: [Memory Performance in a Nutshell][https://www.intel.com/content/www/us/en/developer/articles/technical/memory-performance-in-a-nutshell.html], the data is from 2016 but what’s important are the latency ratios which are pretty constant.)
 
 ## An Example
 
 This might be interesting, but how does that affect you as a developer?
+
 Let's have a look...
 
-Say you have a `User` struct in the following format:
+Say you have the following `User` struct.:
 
 **Listing 1: User struct**
 
@@ -39,27 +32,26 @@ Say you have a `User` struct in the following format:
 05 type User struct {
 06 	Login   string
 07 	Active  bool
-08 	Icon	Image
+08 	Icon	 Image
 09 	Country string
 10 }
 ```
 
-Listing 1 shows the user struct. On line 08 you declare the `Image` field which is an array of 128×128 bytes.
-You might be wondering *why* the icon is part of the `User` struct.
-One reason would be to save an API call - when the client gets the user from the API, it doesn't need to make another call to get the icon.
+Listing 1 shows a struct named `User`. On line 08, the struct has a field named `Image` which is declared as an array of 128×128 bytes. That is a contiguous block of 16k bytes (16,384) of memory.
 
-Say you'd like to count the number of active users you have per country.
-You write the following code:
+You might be wondering *why* the `Icon` field is part of the `User` struct? One reason might be to save an API call when the client retrieves a user from the system. This way the client doesn't need to make a second call to get the icon image.
+
+Now imagine you need to add an API that counts the number of active users in the system by country.
 
 **List 2: CountryCount**
 
 ```go
-12 // CountryCount returns a map of country to number of active users.
+12 // CountryCount returns a map of countries to the number of active users.
 13 func CountryCount(users []User) map[string]int{
 14 	counts := make(map[string]int) // country -> count
 15 	for _, u := range users {
 16     	if !u.Active {
-17         	continue
+17         	    continue
 18     	}
 19     	counts[u.Country]++
 20 	}
@@ -70,144 +62,151 @@ You write the following code:
 
 ## Benchmarking the Code
 
-You decide to benchmark your code, on average there are 10,000 users per query.
-You write `bench_test.go` with the following code:
+This API works great, but then you decide to benchmark the function. 
 
 **Listing 2: Benchmark Code**
-
 ```go
 05 var users []User
 06
 07 func init() {
 08 	const size = 10_000
-09 	countries := []string{
-10     	"AD",
-11     	"BB",
-12     	"CA",
-13     	"DK",
-14 	}
-15 	users = make([]User, size)
-16 	for i := 0; i < size; i++ {
-17     	users[i].Active = i%5 > 0 // 20% non active
-18     	users[i].Country = countries[i%len(countries)]
-19 	}
-20 }
-21
-22 func BenchmarkCountryCount(b *testing.B) {
-23 	for i := 0; i < b.N; i++ {
-24     	m := CountryCount(users)
-25     	if m == nil {
-26         	b.Fatal(m)
-27     	}
-28 	}
-29 }
+09
+10 	countries := []string{
+11         "AD",
+12         "BB",
+13         "CA",
+14         "DK",
+15 	}
+16
+17 	users = make([]User, size)
+18 	for i := 0; i < size; i++ {
+19         users[i].Active = i%5 > 0 // 20% non active
+20         users[i].Country = countries[i%len(countries)]
+21 	}
+22 }
+23
+24 func BenchmarkCountryCount(b *testing.B) {
+25 	for i := 0; i < b.N; i++ {
+26         m := CountryCount(users)
+27         if m == nil {
+28             b.Fatal(m)
+29         }
+30 	}
+31 }
 ```
 
-Listing 2 shows the benchmark code.
-On lines 07-20 you create a `users` slice with 10,000 users and set 20% of them to be non active.
-On lines 22-29 is the benchmark function, it calls `CountryCount` in every loop.
-On lines 25-27 you check that `m != nil` to make sure the compiler does not optimize away the call to `CountryCount`.
-
-Now let's run the benchmark:
+Listing 2 shows the benchmark code. On lines 07-22, an init function is declared to initialize the data for the benchmark. On line 17, a slice is constructed to hold 10,000 users where 20% of them are set to be non active. On lines 24-31, the benchmark function is declared and is written to call the `CountryCount` function in the benchmark loop.
 
 **Listing 3: Running the Benchmark**
 
 ```
-01 $ go test -bench . -count 5
-02 goos: linux
-03 goarch: amd64
-04 pkg: users
-05 cpu: 12th Gen Intel(R) Core(TM) i7-1255U
-06 BenchmarkCountryCount-12         	376   	3233320 ns/op
-07 BenchmarkCountryCount-12         	374   	3313122 ns/op
-08 BenchmarkCountryCount-12         	328   	3204089 ns/op
-09 BenchmarkCountryCount-12         	360   	3190500 ns/op
-10 BenchmarkCountryCount-12         	344   	3143776 ns/op
-11 PASS
-12 ok  	users	7.480s
+$ go test -bench . -benchtime 10s -count 5	 
+
+goos: linux
+goarch: amd64
+pkg: users
+cpu: 12th Gen Intel(R) Core(TM) i7-1255U
+
+BenchmarkCountryCount-12     4442     2630315 ns/op
+BenchmarkCountryCount-12     4143     2814090 ns/op
+BenchmarkCountryCount-12     3848     2642400 ns/op
+BenchmarkCountryCount-12     4255     2639497 ns/op
+BenchmarkCountryCount-12     4131     2661188 ns/op
+
+PASS
+ok     users     67.257s
 ```
 
-Listing 3 shows how to run the benchmark. On line 01 you use the `-bench .` to run all benchmarks use the `-count` flag to run the benchmark 5 times.
-On lines 06-10 you see the benchmark result. The results average to 3216961.40ns per operation, or about 3.21ms per operation.
+Listing 3 shows how to run the benchmark and provides the results. On the first line the Go test command is used to run the benchmark function 5 times, each time for at least 10 seconds. The results of the benchmark average to 2,677,498ns per operation, or about ~2.67ms per operation.
 
-You should have performance goals for your code, and if 3.21ms meets these goals - don't touch the code!
-Let's assume you need better performance and start optimizing the code.
+_Note: You should pay attention to units when running benchmarks. The go tooling usually reports in nanoseconds but you might need to convert to other units. Commonly used units are nanoseconds (ns), microseconds (μs) and milliseconds (ms). If you see the following number in nanoseconds 123,456,789, then 789 are ns, 456 are μs, and 123 are ms. The comma is your friend._
+
+You should have performance goals for your code, and if ~2.67ms meets these goals then don't touch the code to make it run any faster!
+
+Let's assume you need better performance. How can you begin to profile the performance? What should you be looking for?
+
+Let’s inspect cache misses to start.
 
 ## Cache Misses
 
-The code itself seems simple, but it's not cache friendly.
-Let's take a look at my CPU cache sizes:
+Let's take a look at the size of the CPU caches I’m using to run this code:
 
 **Listing 4: CPU Cache information**
 
 ```
-01 $ lscpu --caches
-02 NAME ONE-SIZE ALL-SIZE WAYS TYPE    	LEVEL  SETS PHY-LINE COHERENCY-SIZE
-03 L1d   	48K 	352K   12 Data        	1	64    	1         	64
-04 L1i   	32K 	576K	8 Instruction 	1	64    	1         	64
-05 L2   	1.3M 	6.5M   10 Unified     	2  2048    	1         	64
-06 L3    	12M  	12M   12 Unified     	3 16384    	1         	64
+$ lscpu --caches
+
+NAME ONE-SIZE ALL-SIZE WAYS TYPE    	LEVEL  SETS PHY-LINE COHERENCY-SIZE
+L1d   48K     352K     12   Data        1      64   1        64
+L1i   32K     576K      8   Instruction 1      64   1        64
+L2   1.3M     6.5M     10   Unified     2    2048   1        64
+L3    12M      12M     12   Unified     3   16384   1        64
 ```
 
-Listing 4 shows how to get the CPU cache information. On line 01 we call the `lscpu` utility with the `--caches` flag.
-One lines 03 to 06 we see the sizes of each cache. L1 is 48K, L2 is 1.3M and L3 is 12M.
+Listing 4 shows how to get the CPU cache information. You can see the sizes of each cache: L1 is 48K, L2 is 1.3M, and L3 is 12M.
 
-When you look at our `Icon` type it's `128×128`bytes which is about 16k, you have 10,000 users in our `users` benchmark slice which is comes to about 163.8M (I ignore the other fields in the `User` struct since they don't contribute much to the struct size). This size of data does not fit in any of the caches.
+Remember the `Icon` field in the `User` struct requires ~16k bytes of contiguous memory. When you multiply that with the 10k users we created for the benchmark, the slice requires ~163 MiB of contiguous memory.That means the slice once it’s constructed can’t fit in any of the caches in its entirety.
 
-To verify that cache misses are the cause of the issue, you can use the linux [perf][perf] utility.
-`perf` works on an executable, so you need to run the test executable directly and not via `go test`.
-By default, `go test` will delete the test executable at the end of the tests, but you can use the `-c` flag to keep it around.
+This is going to cause the hardware to be thrashing memory as it constantly needs to move data from main memory to cache for every element in the slice that is read. The system will behave as if there is random access memory happening even though the memory is laid out contiguously.
 
-[perf]: https://perf.wiki.kernel.org/index.php/Main_Page
+To verify that cache misses are not letting the program run as fast as it could be running, you can use the Linux [perf][https://perf.wiki.kernel.org/index.php/Main_Page] utility. The`perf` command works on an executable, so you need to run the test executable directly and not via `go test`.
+
+By default, `go test` will delete the test executable at the end of running the test, so use the `-c` flag to keep it around.
 
 **Listing 5: Building Test Executable**
 
 ```
-01 $ go test -c
-02 $ ls *.test
-03 users.test
+$ go test -c
+
+$ ls *.test
+users.test
 ```
 
-Listing 5 shows how to build the test executable. On line 01 you call `go test` with the `-c` flag and on line 02 you use the `ls` utility to see the name of the generated executable.
-
-Once you have the test executable you can run it under `perf`.
+Listing 5 shows how to build and keep the test executable. Once you have the test executable you can run it under `perf`.
 
 **Listing 6: Running the Test Executable Under `perf`**
 
 ```
-01 $ perf stat -e cache-misses ./users.test -test.bench . -test.count=5
-02 goos: linux
-03 goarch: amd64
-04 pkg: users
-05 cpu: 12th Gen Intel(R) Core(TM) i7-1255U
-06 BenchmarkCountryCount-12         	345   	3528938 ns/op
-07 BenchmarkCountryCount-12         	331   	3489025 ns/op
-08 BenchmarkCountryCount-12         	344   	3496701 ns/op
-09 BenchmarkCountryCount-12         	332   	3487785 ns/op
-10 BenchmarkCountryCount-12         	330   	3434735 ns/op
-11 PASS
-12
-13  Performance counter stats for './users.test -test.bench . -test.count=5':
-14
-15  	1,666,805,699  	cpu_core/cache-misses:u/                                            	(96.40%)
-16  	1,333,851,719  	cpu_atom/cache-misses:u/                                            	(4.36%)
-17
-18    	7.707666261 seconds time elapsed
-19
-20    	7.737204000 seconds user
-21    	0.016696000 seconds sys
-22
-23
+$ perf stat -e cache-misses ./users.test -test.bench . -test.benchtime=10s -test.count=5
+
+goos: linux
+goarch: amd64
+pkg: users
+cpu: 12th Gen Intel(R) Core(TM) i7-1255U
+
+BenchmarkCountryCount-12     3799     3153389 ns/op
+BenchmarkCountryCount-12     3460     3094920 ns/op
+BenchmarkCountryCount-12     3662     3073355 ns/op
+BenchmarkCountryCount-12     3774     3166086 ns/op
+BenchmarkCountryCount-12     3688     3091225 ns/op
+
+PASS
+
+Performance counter stats for
+    './users.test -test.bench . -test.benchtime=10s -test.count=5':
+
+     14,075,274,489    cpu_core/cache-misses:u/                                               
+     (99.43%)
+     
+     8,668,379,326     cpu_atom/cache-misses:u/                                            	
+     (0.77%)
+
+     58.990510463 seconds time elapsed
+     58.926667000 seconds user
+      0.119521000 seconds sys
 ```
 
-Listing 6 shows how to run the test executable under the `perf` command. On line 01 you call `perf` telling it to collect cache misses events using the `-e cache-misses` flag. The rest of the arguments to `perf` are the command to run and its arguments. Since you run the test executable directly (and not via `go test`) you need to pass the flags to it with the `-test.` prefix.
-On lines 15 and 16 we see the amount of cache misses. I have two sets of CPUs on my machine, but we'll focus on the core ones. There were about 1.6 billion cache misses during the execution of the benchmark.
+Listing 6 shows how to run the test executable using the `perf` command. You can see the amount of cache misses that occurred on both the core and atom CPUs.There were ~14 billion cache misses during the execution of the benchmark on the core cpu and another ~8 billion on the atom cpu.
+
+_Note: For some Intel platforms (such as AlderLake which is a hybrid platform) there is an atom cpu and core cpu. Each cpu has a dedicated event list. A part of events are available on the core cpu and a part of events are also available on the atom cpu, and even part of events are available on both._
 
 ## Using a Slice
 
-How can we get better? We can use slices instead of arrays. A slice [is defined][slice] as:
+How can we reduce this number of cache misses? If we reduce the size of a `User` struct so more user values fit in the cache at the same time, we could reduce the number of cache misses. Right now we can only fit a few user values in the L1 cache at a time. Using a slice will let us significantly reduce the size of a `User` value.
 
-[slice]: https://github.com/golang/go/blob/master/src/runtime/slice.go#L15
+But why will this help? Let’s look at the declaration of a slice value from the language.
+
+https://github.com/golang/go/blob/master/src/runtime/slice.go#L15
 
 **Listing 7: Slice Implementation**
 
@@ -219,9 +218,7 @@ How can we get better? We can use slices instead of arrays. A slice [is defined]
 05 }
 ```
 
-Listing 7 shows the implementation of slice in the Go runtime. On my machine every field is 64 bits or 8 bytes - a total of 24 bytes.
-
-Let's change the `Image` implementation
+Listing 7 shows the declaration of a slice in Go. On a 64 bit OS, an integer will be 64 bits or 8 bytes. This means a slice value is a total of 24 bytes. By using a slice, we can reduce the size of a user value from ~16k+ bytes to 24 bytes. A significant change.
 
 **Listing 8: New Image**
 
@@ -231,111 +228,114 @@ Let's change the `Image` implementation
 05 type User struct {
 06 	Login   string
 07 	Active  bool
-08 	Icon	Image
+08 	Icon	 Image
 09 	Country string
 10 }
 ```
 
-Listing 7 shows the new implementation of `Image` and `User`, the only change is on line 03 which makes it a byte slice.
+Listing 8 shows the new implementation of the `Image` and `User` types. The only change is on line 03 which uses a slice and the underlying type.
 
-Go allocates the full size of any array automatically.
-To be fair let's change the benchmark code to allocate memory for the icons in the initialization of `users`.
+To be fair let's change the benchmark code to allocate memory for the icons in the initialization of `users`. This memory is no longer allocated with the construction of a User.
 
 **Listing 9: New Initialization**
 
 ```go
 07 func init() {
 08 	const size = 10_000
-09 	countries := []string{
-10     	"AD",
-11     	"BB",
-12     	"CA",
-13     	"DK",
-14 	}
-15 	users = make([]User, size)
-16 	for i := 0; i < size; i++ {
-17     	users[i].Active = i%5 > 0 // 20% non active
-18     	users[i].Country = countries[i%len(countries)]
-19     	users[i].Icon = make([]byte, 128*128)
-20 	}
-21 }
+09
+10 	countries := []string{
+11         "AD",
+12         "BB",
+13         "CA",
+14         "DK",
+15 	}
+16
+17 	users = make([]User, size)
+18 	for i := 0; i < size; i++ {
+19         users[i].Active = i%5 > 0 // 20% non active
+20         users[i].Country = countries[i%len(countries)]
+21         users[i].Icon = make([]byte, 128*128)
+22 	}
+23 }
 ```
 
-Listing 9 shows the new benchmark code, the only change is the addition of line 19 that allocates memory for the `Icon` field.
+Listing 9 shows the new benchmark code, the only change is the addition of line 21 that allocates memory for the `Icon` field.
 
-Now we let's run the benchmark again.
+Now let's run the benchmark again.
 
 **Listing 10: Running the Benchmark**
 
 ```
-01 $ go test -bench . -count 5
-02 goos: linux
-03 goarch: amd64
-04 pkg: users
-05 cpu: 12th Gen Intel(R) Core(TM) i7-1255U
-06 BenchmarkCountryCount-12       	21124     	58382 ns/op
-07 BenchmarkCountryCount-12       	20442     	58994 ns/op
-08 BenchmarkCountryCount-12       	20472     	58525 ns/op
-09 BenchmarkCountryCount-12       	19894     	59722 ns/op
-10 BenchmarkCountryCount-12       	20163     	59980 ns/op
-11 PASS
-12 ok  	users	9.079s
+$ go test -bench . -benchtime=10s -count=5	 
+
+goos: linux
+goarch: amd64
+pkg: users
+cpu: 12th Gen Intel(R) Core(TM) i7-1255U
+
+BenchmarkCountryCount-12     189669     63774 ns/op
+BenchmarkCountryCount-12     185011     63880 ns/op
+BenchmarkCountryCount-12     188542     63865 ns/op
+BenchmarkCountryCount-12     187938     64261 ns/op
+BenchmarkCountryCount-12     186956     64297 ns/op
+
+PASS
+ok     users     63.364s
 ```
 
-Listing 10 shows a running of the benchmark after the changes. The average of lines 06-10 is 59120.60ns per operation.
-About 54.4 times faster than the previous version.
+Listing 10 shows the second run of the benchmark. You can see the average is now 64015.40ns per operation or ~64 microseconds. About ~41.8 times faster than the previous version.
 
 To make sure there are less cache misses, let's run the code under `perf` again.
 
 **Listing 11: Running the Test Executable Under `perf`**
 
 ```
-01 $ go test -c
-02 $ perf stat -e cache-misses ./users.test -test.bench . -test.count=5
-03 goos: linux
-04 goarch: amd64
-05 pkg: users
-06 cpu: 12th Gen Intel(R) Core(TM) i7-1255U
-07 BenchmarkCountryCount-12       	20756     	59736 ns/op
-08 BenchmarkCountryCount-12       	20162     	58511 ns/op
-09 BenchmarkCountryCount-12       	20114     	59946 ns/op
-10 BenchmarkCountryCount-12       	19858     	59116 ns/op
-11 BenchmarkCountryCount-12       	20235     	58823 ns/op
-12 PASS
-13
-14  Performance counter stats for './users.test -test.bench . -test.count=5':
-15
-16        	654,670  	cpu_core/cache-misses:u/                                            	(98.40%)
-17     	12,561,851  	cpu_atom/cache-misses:u/                                            	(2.13%)
-18
-19    	9.062694134 seconds time elapsed
-20
-21    	9.082485000 seconds user
-22    	0.026707000 seconds sys
-23
-24
+$ perf stat -e cache-misses ./users.test -test.bench . -test.benchtime=10s -test.count=5
+
+goos: linux
+goarch: amd64
+pkg: users
+cpu: 12th Gen Intel(R) Core(TM) i7-1255U
+
+BenchmarkCountryCount-12     191288     62885 ns/op
+BenchmarkCountryCount-12     193185     63890 ns/op
+BenchmarkCountryCount-12     185040     63432 ns/op
+BenchmarkCountryCount-12     190237     63356 ns/op
+BenchmarkCountryCount-12     191358     63726 ns/op
+
+PASS
+
+Performance counter stats for
+     './users.test -test.bench . -test.benchtime=10s -test.count=5':
+
+     1,828,311  	cpu_core/cache-misses:u/                                            	
+     (99.69%)
+
+     306,533,948  	cpu_atom/cache-misses:u/                                            	
+     (0.31%)
+
+     63.630108076 seconds time elapsed
+     63.610744000 seconds user
+      0.103127000 seconds sys
 ```
 
-On listing 11 you run the benchmark code under `perf`. On line 01 you use `go test -c` to generate the test executable and on line 02 you run it under `perf`. On line 16 you can see 654,670 cache misses, much less than the previous 1,666,805,699.
+Listing 11 shows the second run of `perf`. You can see there are now ~1.8 million cache misses on the cpu core and another ~306 million on the atom core. Back in listing 6 you will see the original values were in the billions.
 
-The new `User` struct has an `Icon` field which is 32 bytes instead of the previous 128×128.
-More data fits inside cache lines leading to faster code.
+Now that more users fit inside the cache, we are seeing less cache misses and better performance.
 
 ## Summary
 
 One of the reasons I love optimizing code for my clients is the extent of knowledge I need to learn.
 Not only data structures and algorithms, but also computer architecture, how the Go runtime works, networking and much more. And I also get to play with cool new tools (such as `perf`)
 
-You got a significant performance boost from a small code change, but TANSTAAFL[^fl].
+You got a significant performance boost from a small code change, but [There ain't no such thing as a free lunch](https://en.wikipedia.org/wiki/There_ain%27t_no_such_thing_as_a_free_lunch).
+
 The code is riskier since now `Icon` might be `nil`.
+
 You also need to allocate memory on the heap per `User` struct, heap allocation takes more time.
 Lastly, the garbage collector needs to work harder since we have more data on the heap - but that is a discussion for another blog post.
 
-If you want to read more on the subject, you can start with reading [Cache-oblivious algorithm][co] and following the links there.
+If you want to read more on the subject, you can start with reading [Cache-oblivious algorithm][https://en.wikipedia.org/wiki/Cache-oblivious_algorithm] and following the links there.
 
-You can find the code for this blog post [here][gh].
-
-[co]: https://en.wikipedia.org/wiki/Cache-oblivious_algorithm
-[gh]: https://github.com/353words/cpu_cache
-[^fl]: [There ain't no such thing as a free lunch](https://en.wikipedia.org/wiki/There_ain%27t_no_such_thing_as_a_free_lunch)
+You can find the code for this blog post [here][https://github.com/353words/cpu_cache].
 
